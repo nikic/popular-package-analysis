@@ -2,7 +2,7 @@
 
 use PhpParser\Node\Expr;
 
-require __DIR__ . '/../PHP-Parser/vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
 $lexer = new PhpParser\Lexer\Emulative([
     'usedAttributes' => [
@@ -15,8 +15,29 @@ $parser = new PhpParser\Parser\Php7($lexer);
 $visitor = new class extends PhpParser\NodeVisitorAbstract {
     public $path = null;
     public $code = null;
+    public $totalArrayDimFetches = 0;
+    public $alternativeArrayDimFetches = 0;
+
     public function enterNode(PhpParser\Node $node) {
-        if (!$node instanceof Expr\Ternary) {
+        if (!$node instanceof Expr\ArrayDimFetch) {
+            return;
+        }
+
+        $this->totalArrayDimFetches++;
+        if ($this->code[$node->getEndFilePos()] !== '}') {
+            return;
+        }
+
+        // Special case: Don't recognize ${foo[x]}
+        if (substr($this->code, $node->getStartFilePos(), 2) === '${') {
+            return;
+        }
+
+        $this->alternativeArrayDimFetches++;
+        echo $this->path . ":" . $node->getStartLine() . "\n";
+        echo "    " . $this->getCode($node) . "\n";
+
+        /*if (!$node instanceof Expr\Ternary) {
             return;
         }
 
@@ -37,7 +58,7 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
             echo "With parens\n\n";
         } else {
             echo "WITHOUT parens\n\n";
-        }
+        }*/
 
         /*if ($node instanceof Expr\BinaryOp\Plus ||
             $node instanceof Expr\BinaryOp\Minus
@@ -59,6 +80,12 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
 
         echo $this->path . ":" . $node->getStartLine() . "\n";
         echo "POSSIBLE\n\n";*/
+    }
+
+    private function getCode(PhpParser\Node $node) {
+        $startPos = $node->getStartFilePos();
+        $endPos = $node->getEndFilePos();
+        return substr($this->code, $startPos, $endPos - $startPos + 1);
     }
 };
 
@@ -94,3 +121,6 @@ foreach ($it as $f) {
     $visitor->code = $code;
     $traverser->traverse($stmts);
 }
+
+echo "Total array dim fetches: ", $visitor->totalArrayDimFetches, "\n";
+echo "Alternative array dim fetches: ", $visitor->alternativeArrayDimFetches, "\n";
