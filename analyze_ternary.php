@@ -1,6 +1,8 @@
 <?php error_reporting(E_ALL);
 
 use PhpParser\Node\Expr;
+use PhpParser\Node\Name;
+use PhpParser\Node\Stmt;
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -17,9 +19,98 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
     public $code = null;
     public $totalArrayDimFetches = 0;
     public $alternativeArrayDimFetches = 0;
+    public $totalClasses = 0;
+    public $reservedClassNames = 0;
+
+    public $fnCalls = [];
+    public $traits = [];
+    public $inTrait = false;
+    public $i = 0;
+    public $switches = [];
 
     public function enterNode(PhpParser\Node $node) {
-        if (!$node instanceof Expr\ArrayDimFetch) {
+        if ($node instanceof Stmt\Switch_) {
+            $this->i++;
+            $this->switches[] =
+                "Switch $this->i at $this->path:" . $node->getStartLine() . "\n" .
+                $this->getCode($node) . "\n\n";
+        }
+
+        /*if ($node instanceof Stmt\Trait_) {
+            $this->inTrait = true;
+            return;
+        }
+
+        if ($node instanceof Stmt\TraitUse) {
+            if (count($node->traits) == 1) {
+                return;
+            }
+
+            foreach ($node->adaptations as $adaptation) {
+                if ($adaptation instanceof Stmt\TraitUseAdaptation\Alias
+                        && $adaptation->trait === null) {
+                    echo $this->path . ":" . $node->getStartLine() . "\n";
+                    echo $this->getCode($node) . "\n\n";
+                }
+            }
+        }*/
+
+        /*if ($node instanceof Stmt\Class_ && $node->isAnonymous()) {
+            echo $this->path . ":" . $node->getStartLine() . "\n";
+            echo $this->getCode($node) . "\n\n";
+        }*/
+
+        /*if ($this->inTrait && $node instanceof Stmt\ClassMethod) {
+            if ($node->isAbstract()) {
+                echo $this->path . ":" . $node->getStartLine() . "\n";
+                echo "    " . $this->getCode($node) . "\n";
+            }
+        }*/
+
+        /*if (!$node instanceof Expr\ShellExec) {
+            return;
+        }
+
+        echo $this->path . ":" . $node->getStartLine() . "\n";
+        echo "    " . $this->getCode($node) . "\n";*/
+
+        /*if (!$node instanceof Expr\FuncCall || !$node->name instanceof Name) {
+            return;
+        }
+
+        $name = $node->name->toLowerString();
+        $this->fnCalls[$name] = ($this->fnCalls[$name] ?? 0) + 1;*/
+
+        /*if (!$node instanceof Stmt\ClassLike || !isset($node->name)) {
+            return;
+        }
+
+        $this->totalClasses++;
+
+        if (!isset($node->name)) {
+            return;
+        }
+
+        $primitiveTypes = [
+            'bool' => true,
+            'false' => true,
+            'float' => true,
+            'int' => true,
+            'null' => true,
+            'string' => true,
+            'true' => true,
+            'void' => true,
+            'iterable' => true,
+            'object' => true,
+        ];
+        if (!isset($primitiveTypes[$node->name->toLowerString()])) {
+            return;
+        }
+
+        $this->reservedClassNames++;
+        echo $this->path . ":" . $node->getStartLine() . "\n";
+        echo "    " . $node->name . "\n";*/
+        /*if (!$node instanceof Expr\ArrayDimFetch) {
             return;
         }
 
@@ -35,7 +126,7 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
 
         $this->alternativeArrayDimFetches++;
         echo $this->path . ":" . $node->getStartLine() . "\n";
-        echo "    " . $this->getCode($node) . "\n";
+        echo "    " . $this->getCode($node) . "\n";*/
 
         /*if (!$node instanceof Expr\Ternary) {
             return;
@@ -82,6 +173,12 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
         echo "POSSIBLE\n\n";*/
     }
 
+    public function leaveNode(PhpParser\Node $node) {
+        if ($node instanceof Stmt\Trait_) {
+            $this->inTrait = false;
+        }
+    }
+
     private function getCode(PhpParser\Node $node) {
         $startPos = $node->getStartFilePos();
         $endPos = $node->getEndFilePos();
@@ -90,6 +187,7 @@ $visitor = new class extends PhpParser\NodeVisitorAbstract {
 };
 
 $traverser = new PhpParser\NodeTraverser;
+$traverser->addVisitor(new PhpParser\NodeVisitor\NameResolver);
 $traverser->addVisitor($visitor);
 
 $it = new RecursiveIteratorIterator(
@@ -105,15 +203,15 @@ foreach ($it as $f) {
     }
 
     if (++$i % 1000 == 0) {
-        echo $i . "\n";
+        fwrite(STDERR, $i . "\n");
     }
 
     $code = file_get_contents($path);
     try {
         $stmts = $parser->parse($code);
     } catch (PhpParser\Error $e) {
-        echo $path . "\n";
-        echo "Parse error: " . $e->getMessage() . "\n";
+        fwrite(STDERR, $path . "\n");
+        fwrite(STDERR, "Parse error: " . $e->getMessage() . "\n");
         continue;
     }
 
@@ -122,5 +220,13 @@ foreach ($it as $f) {
     $traverser->traverse($stmts);
 }
 
-echo "Total array dim fetches: ", $visitor->totalArrayDimFetches, "\n";
-echo "Alternative array dim fetches: ", $visitor->alternativeArrayDimFetches, "\n";
+//echo "Total array dim fetches: ", $visitor->totalArrayDimFetches, "\n";
+//echo "Alternative array dim fetches: ", $visitor->alternativeArrayDimFetches, "\n";
+//echo "Total classes: ", $visitor->totalClasses, "\n";
+//echo "Total reserved class names: ", $visitor->reservedClassNames, "\n";
+//echo json_encode($visitor->fnCalls);
+//echo json_encode($visitor->traits);
+
+$switches = $visitor->switches;
+shuffle($switches);
+echo implode($switches);
