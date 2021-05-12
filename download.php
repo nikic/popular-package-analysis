@@ -36,7 +36,7 @@ foreach (getTopPackages($minPackage, $maxPackage) as $i => $packageName) {
     } else if (isset($versions['dev-main'])) {
         $version = 'dev-main';
     } else {
-        // Pick lastest version.
+        // Pick latest version.
         $keys = array_keys($versions);
         $version = $keys[0];
     }
