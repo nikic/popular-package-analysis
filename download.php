@@ -28,15 +28,17 @@ $maxPackage = $argv[2];
 foreach (getTopPackages($minPackage, $maxPackage) as $i => $packageName) {
     echo "[$i] $packageName\n";
     $packageName = strtolower($packageName);
-    $url = 'https://repo.packagist.org/p/' . $packageName . '.json';
+    $url = 'https://packagist.org/packages/' . $packageName . '.json';
     $json = json_decode(file_get_contents($url), true);
-    $versions = $json['packages'][$packageName];
+    $versions = $json['package']['versions'];
     if (isset($versions['dev-master'])) {
         $version = 'dev-master';
+    } else if (isset($versions['dev-main'])) {
+        $version = 'dev-main';
     } else {
-        // Pick last version.
+        // Pick latest version.
         $keys = array_keys($versions);
-        $version = $keys[count($keys) - 1];
+        $version = $keys[0];
     }
 
     $package = $versions[$version];
